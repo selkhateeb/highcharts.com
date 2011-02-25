@@ -3130,6 +3130,13 @@ var VMLElement = extendClass( SVGElement, {
 		// simplest possible event model for internal use
 		this.element['on'+ eventType] = function() {
 			var evt = win.event;
+            if(!evt){
+                var len = win.frames.length;
+                for (var i = 0; i < len; i++) {
+                    evt = win.frames[i].window.event;
+                    if(evt) break;
+                }
+            }
 			evt.target = evt.srcElement;
 			handler(evt);
 		};
@@ -5853,6 +5860,13 @@ function Chart (options, callback) {
 			
 			// common IE normalizing
 			e = e || win.event;
+            if(!evt){
+                var len = win.frames.length;
+                for (var i = 0; i < len; i++) {
+                    evt = win.frames[i].window.event;
+                    if(evt) break;
+                }
+            }
 			if (!e.target) {
 				e.target = e.srcElement;
 			}
