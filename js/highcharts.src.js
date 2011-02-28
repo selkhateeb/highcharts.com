@@ -705,6 +705,8 @@ defaultLabelOptions = {
 };
 
 defaultOptions = {
+    doc: doc,
+    win: win,
 	colors: ['#4572A7', '#AA4643', '#89A54E', '#80699B', '#3D96AE', 
 		'#DB843D', '#92A8CD', '#A47D7C', '#B5CA92'],
 	symbols: ['circle', 'diamond', 'square', 'triangle', 'triangle-down'],
@@ -3798,7 +3800,8 @@ var Renderer = hasSVG ?	SVGRenderer : VMLRenderer;
  * @param {Function} callback Function to run when the chart has loaded
  */
 function Chart (options, callback) {
-	
+    var win = options.win;
+    var doc = options.doc;
 	defaultXAxisOptions = merge(defaultXAxisOptions, defaultOptions.xAxis);
 	defaultYAxisOptions = merge(defaultYAxisOptions, defaultOptions.yAxis);
 	defaultOptions.xAxis = defaultOptions.yAxis = null;
