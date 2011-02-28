@@ -5860,11 +5860,11 @@ function Chart (options, callback) {
 			
 			// common IE normalizing
 			e = e || win.event;
-            if(!evt){
+            if(!e){
                 var len = win.frames.length;
                 for (var i = 0; i < len; i++) {
-                    evt = win.frames[i].window.event;
-                    if(evt) break;
+                    e = win.frames[i].window.event;
+                    if(e) break;
                 }
             }
 			if (!e.target) {
