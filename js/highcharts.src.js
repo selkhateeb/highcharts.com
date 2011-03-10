@@ -1542,8 +1542,11 @@ SVGElement.prototype = {
 				// emulate VML's dashstyle implementation
 				} else if (key == 'dashstyle') {
 					key = 'stroke-dasharray';
-					if (value) {
-						value = value.toLowerCase()
+					value = value && value.toLowerCase();
+					if (value == 'solid') {
+						value = NONE;
+					} else if (value) {
+						value = value
 							.replace('shortdashdotdot', '3,1,1,1,1,1,')
 							.replace('shortdashdot', '3,1,1,1')
 							.replace('shortdot', '1,1,')
@@ -1558,6 +1561,7 @@ SVGElement.prototype = {
 						while (i--) {
 							value[i] = pInt(value[i]) * hash['stroke-width'];
 						}
+						
 						value = value.join(',');
 					}	
 					
@@ -1607,11 +1611,11 @@ SVGElement.prototype = {
 					}					
 				}
 				
-				/* trows errors in Chrome
+				// validate heights
 				if ((key == 'width' || key == 'height') && nodeName == 'rect' && value < 0) {
-					console.log(element);
+					value = 0;
 				}
-				*/
+				
 				
 					
 				
@@ -1708,6 +1712,7 @@ SVGElement.prototype = {
 		var elemWrapper = this,
 			elem = elemWrapper.element,
 			textWidth = styles && styles.width && elem.nodeName == 'text';
+			
 		
 		// convert legacy
 		if (styles && styles.color) {
@@ -2155,7 +2160,7 @@ SVGRenderer.prototype = {
 				.replace(/<(i|em)>/g, '<span style="font-style:italic">')
 				.replace(/<a/g, '<span')
 				.replace(/<\/(b|strong|i|em|a)>/g, '</span>')
-				.split(/<br[^>]?>/g),
+				.split(/<br.*?>/g),
 			childNodes = textNode.childNodes,
 			styleRegex = /style="([^"]+)"/,
 			hrefRegex = /href="([^"]+)"/,
@@ -4034,7 +4039,7 @@ function Chart (options, callback) {
 					});
 				
 				// prepare CSS
-				css = width && {width: (width - 2 * (labelOptions.padding || 10)) +PX};
+				css = width && { width: mathMax(1, mathRound(width - 2 * (labelOptions.padding || 10))) +PX };
 				css = extend(css, labelOptions.style);
 				
 				// first call
@@ -4275,7 +4280,7 @@ function Chart (options, callback) {
 			else if (defined(from) && defined(to)) {
 				// keep within plot area
 				from = mathMax(from, min);
-				to = mathMin(to, max);  
+				to = mathMin(to, max);
 			
 				toPath = getPlotLinePath(to);
 				path = getPlotLinePath(from);
@@ -4357,8 +4362,8 @@ function Chart (options, callback) {
 				}
 				
 				// get the bounding box and align the label
-				xs = [path[1], path[4], path[6] || path[1]];
-				ys = [path[2], path[5], path[7] || path[2]];
+				xs = [path[1], path[4], pick(path[6], path[1])];
+				ys = [path[2], path[5], pick(path[7], path[2])];
 				x = mathMin.apply(math, xs);
 				y = mathMin.apply(math, ys);
 				
@@ -7446,8 +7451,8 @@ function Chart (options, callback) {
 		
 		oldChartHeight = chartHeight;
 		oldChartWidth = chartWidth;
-		chartWidth = mathRound(width);
-		chartHeight = mathRound(height);
+		chart.chartWidth = chartWidth = mathRound(width);
+		chart.chartHeight = chartHeight = mathRound(height);
 		
 		css(container, {
 			width: chartWidth + PX,
