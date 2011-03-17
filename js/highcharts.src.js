@@ -258,7 +258,7 @@ function serializeCSS(style) {
 		key;
 	// serialize the declaration
 	for (key in style) {
-		s += hyphenate(key) +':'+ style[key] + ';';
+		s += key +':'+ style[key] + ';';
 	}
 	return s;
 	
@@ -713,8 +713,8 @@ defaultLabelOptions = {
 	},*/
 	style: {
 		color: '#666',
-		fontSize: '11px',
-		lineHeight: '14px'
+		'font-size': '11px',
+		'line-height': '14px'
 	}
 };
 
@@ -1616,9 +1616,6 @@ SVGElement.prototype = {
 					value = 0;
 				}
 				
-				
-					
-				
 				if (key == 'text') {
 					// only one node allowed
 					this.textStr = value;
@@ -1711,8 +1708,17 @@ SVGElement.prototype = {
 	css: function(styles) {
 		var elemWrapper = this,
 			elem = elemWrapper.element,
-			textWidth = styles && styles.width && elem.nodeName == 'text';
+			textWidth = styles && styles.width && elem.nodeName == 'text',
+			camelStyles = styles,
+			n;
 			
+		// hyphenate
+		if (defined(styles)) {
+			styles = {};
+			for (n in camelStyles) {
+				styles[hyphenate(n)] = camelStyles[n];
+			}
+		}
 		
 		// convert legacy
 		if (styles && styles.color) {
@@ -2060,7 +2066,7 @@ SVGElement.prototype = {
 	 * Add a shadow to the element. Must be done after the element is added to the DOM
 	 * @param {Boolean} apply
 	 */
-	shadow: function(apply) {
+	shadow: function(apply, group) {
 		var shadows = [],
 			i,
 			shadow,
@@ -2082,8 +2088,11 @@ SVGElement.prototype = {
 					'fill': NONE
 				});
 				
-				
-				element.parentNode.insertBefore(shadow, element);
+				if (group) {
+					group.element.appendChild(shadow);
+				} else {
+					element.parentNode.insertBefore(shadow, element);
+				}
 				
 				shadows.push(shadow);
 			}
@@ -2169,7 +2178,7 @@ SVGRenderer.prototype = {
 			reverse = isFirefox && textStyles && textStyles.HcDirection == 'rtl' && !this.forExport, // issue #38
 			arr,
 			width = textStyles && pInt(textStyles.width),
-			textLineHeight = textStyles && textStyles.lineHeight,
+			textLineHeight = textStyles && textStyles['line-height'],
 			lastLine,
 			i = childNodes.length;
 		
@@ -3286,7 +3295,7 @@ var VMLElement = extendClass( SVGElement, {
 	 * Apply a drop shadow by copying elements and giving them different strokes 
 	 * @param {Boolean} apply
 	 */
-	shadow: function(apply) {
+	shadow: function(apply, group) {
 		var shadows = [],
 			i,
 			element = this.element,
@@ -3319,7 +3328,11 @@ var VMLElement = extendClass( SVGElement, {
 				
 				
 				// insert it
-				element.parentNode.insertBefore(shadow, element);
+				if (group) {
+					group.element.appendChild(shadow);
+				} else {
+					element.parentNode.insertBefore(shadow, element);
+				}
 				
 				// record it
 				shadows.push(shadow);				
@@ -4183,7 +4196,7 @@ function Chart (options, callback) {
 						
 					// vertically centered
 					if (!defined(labelOptions.y)) {
-						y += parseInt(label.styles.lineHeight) * 0.9 - label.getBBox().height / 2;
+						y += parseInt(label.styles['line-height']) * 0.9 - label.getBBox().height / 2;
 					}
 					
 						
@@ -9172,7 +9185,7 @@ Series.prototype = {
 				// vertically centered
 				if (inverted && !options.y) {
 					dataLabel.attr({
-						y: y + parseInt(dataLabel.styles.lineHeight) * 0.9 - dataLabel.getBBox().height / 2
+						y: y + parseInt(dataLabel.styles['line-height']) * 0.9 - dataLabel.getBBox().height / 2
 					});
 				}
 				
@@ -10219,7 +10232,8 @@ var PiePoint = extendClass(Point, {
 		var point = this,
 			series = point.series,
 			chart = series.chart,
-			slicedTranslation = point.slicedTranslation;
+			slicedTranslation = point.slicedTranslation,
+			translation;
 			
 		setAnimation(animation, chart);
 		
@@ -10229,10 +10243,14 @@ var PiePoint = extendClass(Point, {
 		// if called without an argument, toggle
 		sliced = point.sliced = defined(sliced) ? sliced : !point.sliced;
 		
-		point.group.animate({
+		translation = {
 			translateX: (sliced ? slicedTranslation[0] : chart.plotLeft),
 			translateY: (sliced ? slicedTranslation[1] : chart.plotTop)
-		});
+		};
+		point.group.animate(translation);
+		if (point.shadowGroup) {
+			point.shadowGroup.animate(translation);
+		}
 		
 	}
 });
@@ -10444,14 +10462,25 @@ var PieSeries = extendClass(Series, {
 			//center,
 			graphic,
 			group,
+			shadow = series.options.shadow,
+			shadowGroup,
 			shapeArgs;
+			
 		
 		// draw the slices
 		each(series.data, function(point) {
 			graphic = point.graphic;
 			shapeArgs = point.shapeArgs;
 			group = point.group;
+			shadowGroup = point.shadowGroup;
 
+			// put the shadow behind all points
+			if (shadow && !shadowGroup) {
+				shadowGroup = point.shadowGroup = renderer.g('shadow')
+					.attr({ zIndex: 4 })
+					.add();
+			}
+		
 			// create the group the first time
 			if (!group) {
 				group = point.group = renderer.g('point')
@@ -10461,7 +10490,10 @@ var PieSeries = extendClass(Series, {
 			
 			// if the point is sliced, use special translation, else use plot area traslation
 			groupTranslation = point.sliced ? point.slicedTranslation : [chart.plotLeft, chart.plotTop];
-			group.translate(groupTranslation[0], groupTranslation[1])
+			group.translate(groupTranslation[0], groupTranslation[1]);
+			if (shadowGroup) {
+				shadowGroup.translate(groupTranslation[0], groupTranslation[1]);
+			}
 				
 			
 			// draw the slice
@@ -10474,7 +10506,8 @@ var PieSeries = extendClass(Series, {
 						point.pointAttr[NORMAL_STATE],
 						{'stroke-linejoin': 'round'}
 					))
-					.add(point.group);
+					.add(point.group)
+					.shadow(shadow, shadowGroup);
 			}
 			
 			// detect point specific visibility
