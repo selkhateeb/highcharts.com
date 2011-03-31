@@ -1,6 +1,6 @@
 /** 
- * @license Highcharts JS v2.0 (prerelease)
- * Candlestick/OHLC series module
+ * @license Highcharts JS v2.1.4 (2011-03-02)
+ * Candlestick/OHLC series module, Beta
  * 
  * (c) 2010 Torstein Hønsi
  * 
@@ -202,7 +202,7 @@ var OHLCSeries = Highcharts.extendClass(seriesTypes.column, {
 						.add(series.group);
 				}
 				
-			} else {
+			} else if (graphic) {
 				point.graphic = graphic.destroy();	
 			}			
 			
@@ -341,7 +341,7 @@ var CandlestickSeries = Highcharts.extendClass(OHLCSeries, {
 						.add(series.group);
 				}
 				
-			} else {
+			} else if (graphic) {
 				point.graphic = graphic.destroy();	
 			}
 			

@@ -2,7 +2,7 @@
 // @compilation_level SIMPLE_OPTIMIZATIONS
 
 /**
- * @license Highcharts JS v2.1.3 (2011-02-07)
+ * @license Highcharts JS v2.1.4 (2011-03-02)
  * 
  * (c) 2009-2010 Torstein Hønsi
  * 
@@ -258,7 +258,7 @@ function serializeCSS(style) {
 		key;
 	// serialize the declaration
 	for (key in style) {
-		s += hyphenate(key) +':'+ style[key] + ';';
+		s += key +':'+ style[key] + ';';
 	}
 	return s;
 	
@@ -713,8 +713,8 @@ defaultLabelOptions = {
 	},*/
 	style: {
 		color: '#666',
-		fontSize: '11px',
-		lineHeight: '14px'
+		'font-size': '11px',
+		'line-height': '14px'
 	}
 };
 
@@ -1542,8 +1542,11 @@ SVGElement.prototype = {
 				// emulate VML's dashstyle implementation
 				} else if (key == 'dashstyle') {
 					key = 'stroke-dasharray';
-					if (value) {
-						value = value.toLowerCase()
+					value = value && value.toLowerCase();
+					if (value == 'solid') {
+						value = NONE;
+					} else if (value) {
+						value = value
 							.replace('shortdashdotdot', '3,1,1,1,1,1,')
 							.replace('shortdashdot', '3,1,1,1')
 							.replace('shortdot', '1,1,')
@@ -1558,6 +1561,7 @@ SVGElement.prototype = {
 						while (i--) {
 							value[i] = pInt(value[i]) * hash['stroke-width'];
 						}
+						
 						value = value.join(',');
 					}	
 					
@@ -1607,13 +1611,10 @@ SVGElement.prototype = {
 					}					
 				}
 				
-				/* trows errors in Chrome
+				// validate heights
 				if ((key == 'width' || key == 'height') && nodeName == 'rect' && value < 0) {
-					console.log(element);
+					value = 0;
 				}
-				*/
-				
-					
 				
 				if (key == 'text') {
 					// only one node allowed
@@ -1707,7 +1708,17 @@ SVGElement.prototype = {
 	css: function(styles) {
 		var elemWrapper = this,
 			elem = elemWrapper.element,
-			textWidth = styles && styles.width && elem.nodeName == 'text';
+			textWidth = styles && styles.width && elem.nodeName == 'text',
+			camelStyles = styles,
+			n;
+			
+		// hyphenate
+		if (defined(styles)) {
+			styles = {};
+			for (n in camelStyles) {
+				styles[hyphenate(n)] = camelStyles[n];
+			}
+		}
 		
 		// convert legacy
 		if (styles && styles.color) {
@@ -2055,7 +2066,7 @@ SVGElement.prototype = {
 	 * Add a shadow to the element. Must be done after the element is added to the DOM
 	 * @param {Boolean} apply
 	 */
-	shadow: function(apply) {
+	shadow: function(apply, group) {
 		var shadows = [],
 			i,
 			shadow,
@@ -2077,8 +2088,11 @@ SVGElement.prototype = {
 					'fill': NONE
 				});
 				
-				
-				element.parentNode.insertBefore(shadow, element);
+				if (group) {
+					group.element.appendChild(shadow);
+				} else {
+					element.parentNode.insertBefore(shadow, element);
+				}
 				
 				shadows.push(shadow);
 			}
@@ -2155,7 +2169,7 @@ SVGRenderer.prototype = {
 				.replace(/<(i|em)>/g, '<span style="font-style:italic">')
 				.replace(/<a/g, '<span')
 				.replace(/<\/(b|strong|i|em|a)>/g, '</span>')
-				.split(/<br[^>]?>/g),
+				.split(/<br.*?>/g),
 			childNodes = textNode.childNodes,
 			styleRegex = /style="([^"]+)"/,
 			hrefRegex = /href="([^"]+)"/,
@@ -2164,7 +2178,7 @@ SVGRenderer.prototype = {
 			reverse = isFirefox && textStyles && textStyles.HcDirection == 'rtl' && !this.forExport, // issue #38
 			arr,
 			width = textStyles && pInt(textStyles.width),
-			textLineHeight = textStyles && textStyles.lineHeight,
+			textLineHeight = textStyles && textStyles['line-height'],
 			lastLine,
 			i = childNodes.length;
 		
@@ -2259,8 +2273,8 @@ SVGRenderer.prototype = {
 								if (words.length) {
 									tspan = doc.createElementNS(SVG_NS, 'tspan');
 									attr(tspan, {
-										x: parentX,
-										dy: textLineHeight || 16
+										dy: textLineHeight || 16,
+										x: parentX
 									});
 									textNode.appendChild(tspan);
 								
@@ -2270,12 +2284,12 @@ SVGRenderer.prototype = {
 								}
 							} else { // append to existing line tspan
 								tspan.removeChild(tspan.firstChild);
-								rest.unshift(words.pop());
+								rest.unshift(words.pop());							
 							}
-							
-							tspan.appendChild(doc.createTextNode(words.join(' ').replace(/- /g, '-')));
+							if (words.length) {
+								tspan.appendChild(doc.createTextNode(words.join(' ').replace(/- /g, '-')));
+							}
 						}
-						
 					}
 				}
 			});
@@ -2374,11 +2388,12 @@ SVGRenderer.prototype = {
 			y = x.y;
 			width = x.width;
 			height = x.height;
+			r = x.r;
 			x = x.x;	
 		}
 		var wrapper = this.createElement('rect').attr({
-			rx: r || attr.r,
-			ry: r || attr.r,
+			rx: r,
+			ry: r,
 			fill: NONE
 		});
 		
@@ -3121,19 +3136,24 @@ var VMLElement = extendClass( SVGElement, {
 	 */
 	
 	getBBox: function() {
-		var element = this.element;
+		var wrapper = this,
+			element = wrapper.element,
+			bBox = wrapper.bBox;
 		
-		// faking getBBox in exported SVG in legacy IE
-		if (element.nodeName == 'text') {
-			element.style.position = ABSOLUTE;
+		if (!bBox) {
+			// faking getBBox in exported SVG in legacy IE
+			if (element.nodeName == 'text') {
+				element.style.position = ABSOLUTE;
+			}
+			
+			bBox = wrapper.bBox = {
+				x: element.offsetLeft,
+				y: element.offsetTop,
+				width: element.offsetWidth,
+				height: element.offsetHeight
+			};
 		}
-		
-		return {
-			x: element.offsetLeft,
-			y: element.offsetTop,
-			width: element.offsetWidth,
-			height: element.offsetHeight
-		};
+		return bBox;
 					
 	},
 	
@@ -3280,7 +3300,7 @@ var VMLElement = extendClass( SVGElement, {
 	 * Apply a drop shadow by copying elements and giving them different strokes 
 	 * @param {Boolean} apply
 	 */
-	shadow: function(apply) {
+	shadow: function(apply, group) {
 		var shadows = [],
 			i,
 			element = this.element,
@@ -3313,7 +3333,11 @@ var VMLElement = extendClass( SVGElement, {
 				
 				
 				// insert it
-				element.parentNode.insertBefore(shadow, element);
+				if (group) {
+					group.element.appendChild(shadow);
+				} else {
+					element.parentNode.insertBefore(shadow, element);
+				}
 				
 				// record it
 				shadows.push(shadow);				
@@ -3635,6 +3659,7 @@ VMLRenderer.prototype = merge( SVGRenderer.prototype, { // inherit SVGRenderer
 			y = x.y;
 			width = x.width;
 			height = x.height;
+			r = x.r;
 			x = x.x;
 		}
 		var wrapper = this.symbol('rect');
@@ -3937,8 +3962,8 @@ function Chart (options, callback) {
 			dataMin,
 			dataMax,
 			associatedSeries,
-			userSetMin,
-			userSetMax,
+			userMin,
+			userMax,
 			max = null,
 			min = null,
 			oldMin,
@@ -4032,7 +4057,7 @@ function Chart (options, callback) {
 					});
 				
 				// prepare CSS
-				css = width && {width: (width - 2 * (labelOptions.padding || 10)) +PX};
+				css = width && { width: mathMax(1, mathRound(width - 2 * (labelOptions.padding || 10))) +PX };
 				css = extend(css, labelOptions.style);
 				
 				// first call
@@ -4176,13 +4201,13 @@ function Chart (options, callback) {
 						
 					// vertically centered
 					if (!defined(labelOptions.y)) {
-						y += parseInt(label.styles.lineHeight) * 0.9 - label.getBBox().height / 2;
+						y += parseInt(label.styles['line-height']) * 0.9 - label.getBBox().height / 2;
 					}
 					
 						
 					// correct for staggered labels
 					if (staggerLines) {
-						y += (index % staggerLines) * 16;
+						y += (index / (step || 1) % staggerLines) * 16;
 					}
 					// apply step
 					if (step) {
@@ -4273,7 +4298,7 @@ function Chart (options, callback) {
 			else if (defined(from) && defined(to)) {
 				// keep within plot area
 				from = mathMax(from, min);
-				to = mathMin(to, max);  
+				to = mathMin(to, max);
 			
 				toPath = getPlotLinePath(to);
 				path = getPlotLinePath(from);
@@ -4355,8 +4380,8 @@ function Chart (options, callback) {
 				}
 				
 				// get the bounding box and align the label
-				xs = [path[1], path[4], path[6] || path[1]];
-				ys = [path[2], path[5], path[7] || path[2]];
+				xs = [path[1], path[4], pick(path[6], path[1])];
+				ys = [path[2], path[5], pick(path[7], path[2])];
 				x = mathMin.apply(math, xs);
 				y = mathMin.apply(math, ys);
 				
@@ -4882,8 +4907,8 @@ function Chart (options, callback) {
 			
 			// initial min and max from the extreme data values
 			else {
-				min = pick(userSetMin, options.min, dataMin);
-				max = pick(userSetMax, options.max, dataMax);
+				min = pick(userMin, options.min, dataMin);
+				max = pick(userMax, options.max, dataMax);
 			}
 			
 			// maxZoom exceeded, just center the selection
@@ -4897,10 +4922,10 @@ function Chart (options, callback) {
 			// pad the values to get clear of the chart's edges
 			if (!categories && !usePercentage && !isLinked && defined(min) && defined(max)) {
 				length = (max - min) || 1;
-				if (!defined(options.min) && !defined(userSetMin) && minPadding && (dataMin < 0 || !ignoreMinPadding)) { 
+				if (!defined(options.min) && !defined(userMin) && minPadding && (dataMin < 0 || !ignoreMinPadding)) { 
 					min -= length * minPadding; 
 				}
-				if (!defined(options.max) && !defined(userSetMax)  && maxPadding && (dataMax > 0 || !ignoreMaxPadding)) { 
+				if (!defined(options.max) && !defined(userMax)  && maxPadding && (dataMax > 0 || !ignoreMaxPadding)) { 
 					max += length * maxPadding;
 				}
 			}
@@ -4940,10 +4965,10 @@ function Chart (options, callback) {
 				// pad categorised axis to nearest half unit
 				if (categories || (isXAxis && chart.hasColumn)) {
 					catPad = (categories ? 1 : tickInterval) * 0.5;
-					if (categories || !defined(pick(options.min, userSetMin))) {
+					if (categories || !defined(pick(options.min, userMin))) {
 						min -= catPad;
 					}
-					if (categories || !defined(pick(options.max, userSetMax))) {
+					if (categories || !defined(pick(options.max, userMax))) {
 						max += catPad;
 					}
 				}
@@ -5065,8 +5090,8 @@ function Chart (options, callback) {
 				max: newMax
 			}, function() { // the default event handler
 				
-				userSetMin = newMin;
-				userSetMax = newMax;
+				userMin = newMin;
+				userMax = newMax;
 			
 				
 				// redraw
@@ -5085,7 +5110,9 @@ function Chart (options, callback) {
 				min: min,
 				max: max,
 				dataMin: dataMin,
-				dataMax: dataMax
+				dataMax: dataMax,
+				userMin: userMin,
+				userMax: userMax
 			};
 		}
 		
@@ -5607,15 +5634,15 @@ function Chart (options, callback) {
 			
 			// build the header	
 			s = useHeader ? 
-				['<span style="font-size: 10px">',
-				(isDateTime ? dateFormat('%A, %b %e, %Y', x) :  x),
-				'</span><br/>'] : [];
+				['<span style="font-size: 10px">' +
+				(isDateTime ? dateFormat('%A, %b %e, %Y', x) :  x) +
+				'</span>'] : [];
 						
 			// build the values
 			each(items, function(item) {
 				s.push(item.point.tooltipFormatter(useHeader));
 			});
-			return s.join('');
+			return s.join('<br/>');
 		}
 		
 		/**
@@ -6391,19 +6418,22 @@ function Chart (options, callback) {
 				legendSymbol = item.legendSymbol,
 				hiddenColor = itemHiddenStyle.color,
 				textColor = visible ? options.itemStyle.color : hiddenColor,
-				symbolColor = visible ? item.color : hiddenColor;
+				lineColor = visible ? item.color : hiddenColor,
+				symbolAttr = visible ? item.pointAttr[NORMAL_STATE] : {
+					stroke: hiddenColor,
+					fill: hiddenColor
+				};
+					
 			if (legendItem) {
 				legendItem.css({fill: textColor});
 			}
 			if (legendLine) {
-				legendLine.attr({stroke: symbolColor});
+				legendLine.attr({ stroke: lineColor });
 			}
 			if (legendSymbol) {
-				legendSymbol.attr({ 
-					stroke: symbolColor,
-					fill: symbolColor
-				});
+				legendSymbol.attr(symbolAttr);
 			}
+			
 		}
 		
 		/**
@@ -6575,11 +6605,10 @@ function Chart (options, callback) {
 						(symbolY = -4),
 						item.options.marker.radius
 					)
-					.attr(item.pointAttr[NORMAL_STATE])
-					.attr({zIndex: 3})
+					//.attr(item.pointAttr[NORMAL_STATE])
+					.attr({ zIndex: 3 })
 					.add(legendGroup);
 				
-					
 				}
 				if (legendSymbol) {
 					legendSymbol.xOff = symbolX;
@@ -7444,8 +7473,8 @@ function Chart (options, callback) {
 		
 		oldChartHeight = chartHeight;
 		oldChartWidth = chartWidth;
-		chartWidth = mathRound(width);
-		chartHeight = mathRound(height);
+		chart.chartWidth = chartWidth = mathRound(width);
+		chart.chartHeight = chartHeight = mathRound(height);
 		
 		css(container, {
 			width: chartWidth + PX,
@@ -8110,7 +8139,7 @@ Point.prototype = {
 				
 		return ['<span style="color:'+ series.color +'">', (point.name || series.name), '</span>: ',
 			(!useHeader ? ('<b>x = '+ (point.name || point.x) + ',</b> ') : ''), 
-			'<b>', (!useHeader ? 'y = ' : '' ), point.y, '</b><br/>'].join('');
+			'<b>', (!useHeader ? 'y = ' : '' ), point.y, '</b>'].join('');
 		
 	},
 	
@@ -8378,6 +8407,7 @@ Series.prototype = {
 		series.getColor();
 		series.getSymbol();
 		
+		
 		// set the data
 		series.setData(options.data, false);
 			
@@ -8582,6 +8612,10 @@ Series.prototype = {
 	
 		series.cleanData();	
 		series.getSegments();
+		
+		
+		// cache attributes for shapes
+		series.getAttribs();
 		
 		// redraw
 		series.isDirty = true;
@@ -9165,7 +9199,7 @@ Series.prototype = {
 				// vertically centered
 				if (inverted && !options.y) {
 					dataLabel.attr({
-						y: y + parseInt(dataLabel.styles.lineHeight) * 0.9 - dataLabel.getBBox().height / 2
+						y: y + parseInt(dataLabel.styles['line-height']) * 0.9 - dataLabel.getBBox().height / 2
 					});
 				}
 				
@@ -9375,7 +9409,7 @@ Series.prototype = {
 		}
 		
 		// cache attributes for shapes
-		series.getAttribs();
+		//series.getAttribs();
 		
 		// draw the graph if any
 		if (series.drawGraph) {
@@ -10212,7 +10246,8 @@ var PiePoint = extendClass(Point, {
 		var point = this,
 			series = point.series,
 			chart = series.chart,
-			slicedTranslation = point.slicedTranslation;
+			slicedTranslation = point.slicedTranslation,
+			translation;
 			
 		setAnimation(animation, chart);
 		
@@ -10222,10 +10257,14 @@ var PiePoint = extendClass(Point, {
 		// if called without an argument, toggle
 		sliced = point.sliced = defined(sliced) ? sliced : !point.sliced;
 		
-		point.group.animate({
+		translation = {
 			translateX: (sliced ? slicedTranslation[0] : chart.plotLeft),
 			translateY: (sliced ? slicedTranslation[1] : chart.plotTop)
-		});
+		};
+		point.group.animate(translation);
+		if (point.shadowGroup) {
+			point.shadowGroup.animate(translation);
+		}
 		
 	}
 });
@@ -10408,7 +10447,7 @@ var PieSeries = extendClass(Series, {
 		var series = this;
 			
 		// cache attributes for shapes
-		series.getAttribs();
+		//series.getAttribs();
 
 		this.drawPoints();
 		
@@ -10437,14 +10476,25 @@ var PieSeries = extendClass(Series, {
 			//center,
 			graphic,
 			group,
+			shadow = series.options.shadow,
+			shadowGroup,
 			shapeArgs;
+			
 		
 		// draw the slices
 		each(series.data, function(point) {
 			graphic = point.graphic;
 			shapeArgs = point.shapeArgs;
 			group = point.group;
+			shadowGroup = point.shadowGroup;
 
+			// put the shadow behind all points
+			if (shadow && !shadowGroup) {
+				shadowGroup = point.shadowGroup = renderer.g('shadow')
+					.attr({ zIndex: 4 })
+					.add();
+			}
+		
 			// create the group the first time
 			if (!group) {
 				group = point.group = renderer.g('point')
@@ -10454,7 +10504,10 @@ var PieSeries = extendClass(Series, {
 			
 			// if the point is sliced, use special translation, else use plot area traslation
 			groupTranslation = point.sliced ? point.slicedTranslation : [chart.plotLeft, chart.plotTop];
-			group.translate(groupTranslation[0], groupTranslation[1])
+			group.translate(groupTranslation[0], groupTranslation[1]);
+			if (shadowGroup) {
+				shadowGroup.translate(groupTranslation[0], groupTranslation[1]);
+			}
 				
 			
 			// draw the slice
@@ -10467,7 +10520,8 @@ var PieSeries = extendClass(Series, {
 						point.pointAttr[NORMAL_STATE],
 						{'stroke-linejoin': 'round'}
 					))
-					.add(point.group);
+					.add(point.group)
+					.shadow(shadow, shadowGroup);
 			}
 			
 			// detect point specific visibility
@@ -10696,7 +10750,7 @@ win.Highcharts = {
 	merge: merge,
 	pick: pick,
 	extendClass: extendClass,
-	version: '2.1.3'
+	version: '2.1.4'
 };
 })();
 
