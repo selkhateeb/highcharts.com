@@ -3136,19 +3136,24 @@ var VMLElement = extendClass( SVGElement, {
 	 */
 	
 	getBBox: function() {
-		var element = this.element;
+		var wrapper = this,
+			element = wrapper.element,
+			bBox = wrapper.bBox;
 		
-		// faking getBBox in exported SVG in legacy IE
-		if (element.nodeName == 'text') {
-			element.style.position = ABSOLUTE;
+		if (!bBox) {
+			// faking getBBox in exported SVG in legacy IE
+			if (element.nodeName == 'text') {
+				element.style.position = ABSOLUTE;
+			}
+			
+			bBox = wrapper.bBox = {
+				x: element.offsetLeft,
+				y: element.offsetTop,
+				width: element.offsetWidth,
+				height: element.offsetHeight
+			};
 		}
-		
-		return {
-			x: element.offsetLeft,
-			y: element.offsetTop,
-			width: element.offsetWidth,
-			height: element.offsetHeight
-		};
+		return bBox;
 					
 	},
 	
@@ -3957,8 +3962,8 @@ function Chart (options, callback) {
 			dataMin,
 			dataMax,
 			associatedSeries,
-			userSetMin,
-			userSetMax,
+			userMin,
+			userMax,
 			max = null,
 			min = null,
 			oldMin,
@@ -4202,7 +4207,7 @@ function Chart (options, callback) {
 						
 					// correct for staggered labels
 					if (staggerLines) {
-						y += (index % staggerLines) * 16;
+						y += (index / (step || 1) % staggerLines) * 16;
 					}
 					// apply step
 					if (step) {
@@ -4902,8 +4907,8 @@ function Chart (options, callback) {
 			
 			// initial min and max from the extreme data values
 			else {
-				min = pick(userSetMin, options.min, dataMin);
-				max = pick(userSetMax, options.max, dataMax);
+				min = pick(userMin, options.min, dataMin);
+				max = pick(userMax, options.max, dataMax);
 			}
 			
 			// maxZoom exceeded, just center the selection
@@ -4917,10 +4922,10 @@ function Chart (options, callback) {
 			// pad the values to get clear of the chart's edges
 			if (!categories && !usePercentage && !isLinked && defined(min) && defined(max)) {
 				length = (max - min) || 1;
-				if (!defined(options.min) && !defined(userSetMin) && minPadding && (dataMin < 0 || !ignoreMinPadding)) { 
+				if (!defined(options.min) && !defined(userMin) && minPadding && (dataMin < 0 || !ignoreMinPadding)) { 
 					min -= length * minPadding; 
 				}
-				if (!defined(options.max) && !defined(userSetMax)  && maxPadding && (dataMax > 0 || !ignoreMaxPadding)) { 
+				if (!defined(options.max) && !defined(userMax)  && maxPadding && (dataMax > 0 || !ignoreMaxPadding)) { 
 					max += length * maxPadding;
 				}
 			}
@@ -4960,10 +4965,10 @@ function Chart (options, callback) {
 				// pad categorised axis to nearest half unit
 				if (categories || (isXAxis && chart.hasColumn)) {
 					catPad = (categories ? 1 : tickInterval) * 0.5;
-					if (categories || !defined(pick(options.min, userSetMin))) {
+					if (categories || !defined(pick(options.min, userMin))) {
 						min -= catPad;
 					}
-					if (categories || !defined(pick(options.max, userSetMax))) {
+					if (categories || !defined(pick(options.max, userMax))) {
 						max += catPad;
 					}
 				}
@@ -5085,8 +5090,8 @@ function Chart (options, callback) {
 				max: newMax
 			}, function() { // the default event handler
 				
-				userSetMin = newMin;
-				userSetMax = newMax;
+				userMin = newMin;
+				userMax = newMax;
 			
 				
 				// redraw
@@ -5105,7 +5110,9 @@ function Chart (options, callback) {
 				min: min,
 				max: max,
 				dataMin: dataMin,
-				dataMax: dataMax
+				dataMax: dataMax,
+				userMin: userMin,
+				userMax: userMax
 			};
 		}
 		
@@ -5627,15 +5634,15 @@ function Chart (options, callback) {
 			
 			// build the header	
 			s = useHeader ? 
-				['<span style="font-size: 10px">',
-				(isDateTime ? dateFormat('%A, %b %e, %Y', x) :  x),
-				'</span><br/>'] : [];
+				['<span style="font-size: 10px">' +
+				(isDateTime ? dateFormat('%A, %b %e, %Y', x) :  x) +
+				'</span>'] : [];
 						
 			// build the values
 			each(items, function(item) {
 				s.push(item.point.tooltipFormatter(useHeader));
 			});
-			return s.join('');
+			return s.join('<br/>');
 		}
 		
 		/**
@@ -6411,19 +6418,22 @@ function Chart (options, callback) {
 				legendSymbol = item.legendSymbol,
 				hiddenColor = itemHiddenStyle.color,
 				textColor = visible ? options.itemStyle.color : hiddenColor,
-				symbolColor = visible ? item.color : hiddenColor;
+				lineColor = visible ? item.color : hiddenColor,
+				symbolAttr = visible ? item.pointAttr[NORMAL_STATE] : {
+					stroke: hiddenColor,
+					fill: hiddenColor
+				};
+					
 			if (legendItem) {
 				legendItem.css({fill: textColor});
 			}
 			if (legendLine) {
-				legendLine.attr({stroke: symbolColor});
+				legendLine.attr({ stroke: lineColor });
 			}
 			if (legendSymbol) {
-				legendSymbol.attr({ 
-					stroke: symbolColor,
-					fill: symbolColor
-				});
+				legendSymbol.attr(symbolAttr);
 			}
+			
 		}
 		
 		/**
@@ -6595,11 +6605,10 @@ function Chart (options, callback) {
 						(symbolY = -4),
 						item.options.marker.radius
 					)
-					.attr(item.pointAttr[NORMAL_STATE])
-					.attr({zIndex: 3})
+					//.attr(item.pointAttr[NORMAL_STATE])
+					.attr({ zIndex: 3 })
 					.add(legendGroup);
 				
-					
 				}
 				if (legendSymbol) {
 					legendSymbol.xOff = symbolX;
@@ -8130,7 +8139,7 @@ Point.prototype = {
 				
 		return ['<span style="color:'+ series.color +'">', (point.name || series.name), '</span>: ',
 			(!useHeader ? ('<b>x = '+ (point.name || point.x) + ',</b> ') : ''), 
-			'<b>', (!useHeader ? 'y = ' : '' ), point.y, '</b><br/>'].join('');
+			'<b>', (!useHeader ? 'y = ' : '' ), point.y, '</b>'].join('');
 		
 	},
 	
@@ -8398,6 +8407,7 @@ Series.prototype = {
 		series.getColor();
 		series.getSymbol();
 		
+		
 		// set the data
 		series.setData(options.data, false);
 			
@@ -8602,6 +8612,10 @@ Series.prototype = {
 	
 		series.cleanData();	
 		series.getSegments();
+		
+		
+		// cache attributes for shapes
+		series.getAttribs();
 		
 		// redraw
 		series.isDirty = true;
@@ -9395,7 +9409,7 @@ Series.prototype = {
 		}
 		
 		// cache attributes for shapes
-		series.getAttribs();
+		//series.getAttribs();
 		
 		// draw the graph if any
 		if (series.drawGraph) {
@@ -10433,7 +10447,7 @@ var PieSeries = extendClass(Series, {
 		var series = this;
 			
 		// cache attributes for shapes
-		series.getAttribs();
+		//series.getAttribs();
 
 		this.drawPoints();
 		
