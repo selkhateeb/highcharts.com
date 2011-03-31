@@ -10118,11 +10118,11 @@ var ScatterSeries = extendClass(Series, {
 			if (graphic) { // doesn't exist for null points
 				graphic
 					.attr({isTracker: true})
-					.on('mouseover', function(event) {
+					.on(hasTouch ? 'touchstart' : 'mouseover', function(event) {
 						series.onMouseOver();
 						point.onMouseOver();					
 					})
-					.on('mouseout', function(event) {
+					.on(hasTouch ? 'touchend' : 'mouseout', function(event) {
 						if (!series.options.stickyTracking) {
 							series.onMouseOut();
 						}
