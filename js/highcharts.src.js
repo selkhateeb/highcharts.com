@@ -2265,7 +2265,13 @@ SVGRenderer.prototype = {
 							rest = [];
 							
 						while (words.length || rest.length) {
-							actualWidth = textNode.getBBox().width;
+                            try {
+                                    actualWidth = textNode.getBBox().width;
+
+                                } catch (exception) {
+                                    actualWidth = 0;
+                                }
+
 							tooLong = actualWidth > width;
 							if (!tooLong || words.length == 1) { // new line needed
 								words = rest;
@@ -4057,7 +4063,7 @@ function Chart (options, callback) {
 					});
 				
 				// prepare CSS
-				css = width && { width: mathMax(1, mathRound(width - 2 * (labelOptions.padding || 10))) +PX };
+				css = width && {width: mathMax(1, mathRound(width - 2 * (labelOptions.padding || 10))) +PX};
 				css = extend(css, labelOptions.style);
 				
 				// first call
@@ -6428,7 +6434,7 @@ function Chart (options, callback) {
 				legendItem.css({fill: textColor});
 			}
 			if (legendLine) {
-				legendLine.attr({ stroke: lineColor });
+				legendLine.attr({stroke: lineColor});
 			}
 			if (legendSymbol) {
 				legendSymbol.attr(symbolAttr);
@@ -6606,7 +6612,7 @@ function Chart (options, callback) {
 						item.options.marker.radius
 					)
 					//.attr(item.pointAttr[NORMAL_STATE])
-					.attr({ zIndex: 3 })
+					.attr({zIndex: 3})
 					.add(legendGroup);
 				
 				}
@@ -7287,7 +7293,8 @@ function Chart (options, callback) {
 			});
             //TODO: this should render it in the right document
 //			doc.body.appendChild(renderToClone);
-			chart_doc.body.appendChild(renderToClone);
+            var d = chart_doc || doc;
+			d.body.appendChild(renderToClone);
 		}
 		
 		// get the width and height
@@ -10491,7 +10498,7 @@ var PieSeries = extendClass(Series, {
 			// put the shadow behind all points
 			if (shadow && !shadowGroup) {
 				shadowGroup = point.shadowGroup = renderer.g('shadow')
-					.attr({ zIndex: 4 })
+					.attr({zIndex: 4})
 					.add();
 			}
 		
