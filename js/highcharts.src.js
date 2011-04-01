@@ -8579,6 +8579,7 @@ Series.prototype = {
 		if (shift) {
 			data[0].remove(false);
 		}
+		series.getAttribs();
 		
 		
 		// redraw
@@ -8759,8 +8760,8 @@ Series.prototype = {
 		
 		each(data, function(point, i) {
 			
-			low = data[i - 1] ? data[i - 1].high + 1 : 0;
-			high = point.high = data[i + 1] ? (
+			low = data[i - 1] ? data[i - 1]._high + 1 : 0;
+			high = point._high = data[i + 1] ? (
 				mathFloor((point.plotX + (data[i + 1] ? 
 					data[i + 1].plotX : plotSize)) / 2)) :
 					plotSize;
